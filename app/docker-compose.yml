@@ -1,0 +1,44 @@
+# CampusCare: browser -> Nginx -> Express API -> PostgreSQL
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-campuscare}
+      POSTGRES_USER: ${DB_USER:-campuscare_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in app/.env before starting}
+    volumes:
+      - campuscare_data:/var/lib/postgresql/data
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-campuscare_app} -d ${DB_NAME:-campuscare}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-campuscare}
+      DB_USER: ${DB_USER:-campuscare_app}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in app/.env before starting}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [web, data]
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on: [backend]
+    networks: [web]
+networks:
+  web: {}
+  data:
+    internal: true
+volumes:
+  campuscare_data: {}
